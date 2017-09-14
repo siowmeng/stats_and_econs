@@ -1,0 +1,228 @@
+---
+title: 'Statistics and Econometrics: Problem Set 2'
+author: "Siow Meng Low"
+date: "23 October 2016"
+output: pdf_document
+---
+
+```{r libraries, echo = FALSE, message = FALSE, cache = FALSE}
+library(stargazer)
+library(knitr)
+library(ggplot2)
+library(car)
+
+output <- opts_knit$get("rmarkdown.pandoc.to")
+if (output == "html"){out_format <- "html"}
+if (output == "latex"){out_format <- "latex"}
+
+```
+
+# Question 1  
+
+## Question 1a: Stock Market Performance on CEO Salary  
+
+The equation is given as:  
+
+\begin{center}
+$log(salary) = \beta_0 + \beta_1 log(sales) + \beta_2 roe + \beta_3 ros + u$
+\end{center}
+
+The null hypothesis states that _ros_ has no effect on CEO salary after controlling for _sales_ and _roe_. This can be expressed as: $H_0$: $\beta_3$ = 0  
+
+The alternative hypothesis states that higher _ros_ increases CEO salary (i.e. better stock market performance increases a CEO's salary). This can be expressed as: $H_1$: $\beta_3$ > 0  
+
+## Question 1b: Linear Regression Results and Effects of _ros_  
+
+Table 1 displays the model information of regressing CEO salary (in natural log form) on the firm sales (in natural log form), return on equity, and return on firm's stock.  
+
+```{r Question1b, echo = FALSE, results = "asis"}
+load("ceosal1.RData")
+
+model1b <- lm(lsalary ~ lsales + roe + ros, data = data)
+stargazer(model1b, type = out_format, dep.var.labels = "Log(CEO Salaries)", style = "qje", digits = 4, 
+          header = FALSE, no.space = TRUE, title = "Regression Model for Question 1b")
+
+# Calculate the t-statistic using beta3 coefficient and standard error
+estBeta3 <- model1b$coefficients["ros"]
+estStdErrorBeta3 <- coef(summary(model1b))["ros", "Std. Error"]
+tStat <- estBeta3 / estStdErrorBeta3
+
+```
+
+The question specifies that _ros_ is in percentage form, hence an increase of 50 basis points refer to 0.50 increase in _ros_ value. If _ros_ increases by 50 basis points, CEO salary (_salary_) is predicted to increase by `r round(estBeta3 * 0.50 * 100, 2)`%. This effect on CEO salary is practically very small.  
+
+## Question 1c: Hypothesis Testing of _ros_ Parameter  
+
+The null hypothesis and alternative hypothesis are:  
+
+* $H_0$: $\beta_3$ = 0
+* $H_1$: $\beta_3$ > 0
+
+From the above, it is clear that we would do an one-tail test. The critical value at 10% significance level is thus `r round(qnorm(0.9), 4)` (assume normal distribution since we have large degree of freedom, > 120).  
+
+The t-statistic is $\dfrac{\hat{\beta}_3}{se(\hat{\beta}_3)}$ = `r round(tStat, 4)`. Since this value is way smaller than the critical value `r round(qnorm(0.9), 4)`, we fail to reject the null hypothesis ($\beta_3$ = 0). We conclude that _ros_ has no effect on CEO salary.  
+
+## Question 1d: Inclusion of _ros_ in Final Model  
+
+Since _ros_ is both economically insignificant and statistically insignificant, I would not include it in the final model. Leaving _ros_ out allows us to include other important independent variables that my be highly correlated with _ros_.  
+
+# Question 2  
+
+## Question 2a: Effects of Marijuana on Wage  
+
+The equation is in the following form:  
+
+\begin{center}
+$log(wage) = \beta_0 + \delta_0 female + \beta_1 marijuana + \beta_2 educ + \beta_3 exper + u$
+\end{center}
+
+The variables are described below:  
+
+* _wage_: Respondent's wage
+* _female_: Respondent's gender, = 1 if the respondent is female
+* _marijuana_: Number of times respondent smoked marijuana last month
+* _educ_: Years of education
+* _exper_: Years of experience
+* _u_: Error term
+
+From the above equation, smoking marijuana one more time per month is estimated to change wage by approximately ($100\cdot \beta_1$)%, holding other independent variables fixed. Smoking marijuana five more times per month is estimated to change wage by approximately ($100\cdot 5\beta_1$)%, holding other independent variables fixed.  
+
+## Question 2b: Different Effects of Drug Usage for Men and Women  
+
+The equation for this model is to be expressed in this form:  
+
+\begin{center}
+$log(wage) = \beta_0 + \delta_0 female + \beta_1 marijuana + \delta_1 female \cdot marijuana + \beta_2 educ + \beta_3 exper + u$
+\end{center}
+
+$female{\cdot}marijuana$ is the interaction term between _female_ and _marijuana_. To test that there are no differences in the effects of drug usage for men and women, we would need to test the null hypothesis $H_0: \delta_1 = 0$  
+
+## Question 2c: Drug Usage Categories  
+
+In this question, there is no mention of interactions between marijuana usage and gender, hence we leave out the interactive effects in this section. The equation for this model is to be expressed in this form (nonuser is used as base group):  
+
+\begin{center}
+$log(wage) = \beta_0 + \delta_0 light + \delta_1 moderate + \delta_2 heavy + \delta_3 female + \beta_1 educ + \beta_2 exper + u$
+\end{center}
+
+The three new independent variables are described below:  
+
+* _light_: = 1 if respondent is a light marijuana user (1 to 5 times per month)
+* _moderate_: = 1 if respondent is a moderate marijuana user (6 to 10 times per month)
+* _heavy_: = 1 if respondent is a heavy marijuana user (more than 10 times per month)
+
+## Question 2d: Null Hypothesis - Marijuana Usage Has No Effect on Wage  
+
+To test the null hypothesis that marijuana usage has no effect on wage, we would need to test if ($H_0: \delta_0 = 0, \delta_1 = 0, \delta_2 = 0$) in the equation written in question 2c.  
+
+In other words, we would need to test if these three variables have a joint effect on wage. To perform this test, we would need two models:  
+
+* Unrestricted Model: Same model as in Question 2c
+* Restricted Model: Exclude these three variables (related to marijuana usage) in the unrestricted model  
+
+Using the $R^2$ value from the two models, we shall calculate the F-statistic $F = \dfrac{(R_{ur}^2 - R_{r}^2) / q}{(1 - R_{ur}^2) / (n - k - 1)}$ and compare it with the $F_{q, n - k - 1}$ critical value according to the desired signficance level. In this case, we know that $q = 3$ and $k = 6$.  
+
+If the F-statistic, _F_, is smaller than the critical value, we fail to reject the null hypothesis and we say that the three variables are jointly insignificant, which means marijuana usage has no effect on wage and it is justified to drop the three variables from the model.  
+
+## Question 2e: Potential Problems with Causal Inference  
+
+To draw causal inference using any independent variable in the model, it must not be correlated with the error term, _u_ (in other words, Zero-Conditional-Mean Assumption must hold). For instance, to capture a causal relationship between wages and drug usage, _marijuana_ and _u_ must be uncorrelated.  
+
+However, there may be some other uncaptured factors in _u_ (e.g. family income, drug habits of family members, parents' educational level), which are correlated with individual's drug habit and can affect wages. To draw causal inference using _marijuana_, we will need to capture these data in order to control for these factors.  
+
+\pagebreak
+
+# Question 3  
+
+## Question 3a: Linear Regression Using Experience and Position  
+
+Table 2 displays the model information of regressing points per game (scored by player) on the player's experience (both _exper_ and the quadratic form, _expersq_) and player's position.  
+
+```{r Question3a, echo = FALSE, results = "asis"}
+load("nbasal.RData")
+
+model3a <- lm(points ~ exper + expersq + guard + forward, data = data)
+stargazer(model3a, type = out_format, dep.var.labels = "Points per Game", style = "qje", digits = 4, 
+          header = FALSE, no.space = TRUE, title = "Regression Model for Question 3a")
+
+# Calculate the t-statistic using beta3 coefficient and standard error
+# estBeta3 <- model1b$coefficients["ros"]
+# estStdErrorBeta3 <- coef(summary(model1b))["ros", "Std. Error"]
+# tStat <- estBeta3 / estStdErrorBeta3
+
+guardCoef <- model3a$coefficients["guard"]
+guardPValue <- coef(summary(model3a))["guard", "Pr(>|t|)"]
+
+```
+
+## Question 3b: Guard vs Center  
+
+Holding experience fixed, a guard is predicted to score `r round(guardCoef, 2)` more points than a center per game.  
+
+To test whether this difference is statistically significant, we can test if $H_0: \beta_{guard} = 0$. The corresponding p-Value is `r round(guardPValue, 4)`, which is smaller than 0.05 (assuming we use 5% significance level). Therefore, we reject the null hypothesis $H_0$ and conclude that this difference is statistically significant.  
+
+\pagebreak
+
+## Question 3c: Effect of Marriage  
+
+The right column of table 3 displays the model information of regressing points per game (scored by player) on the player's experience (both _exper_ and the quadratic form, _expersq_), player's position, and player's marital status.  
+
+```{r Question3c, echo = FALSE, results = "asis"}
+
+model3c <- lm(points ~ exper + expersq + guard + forward + marr, data = data)
+stargazer(list(model3a, model3c), type = out_format, dep.var.labels = "Points per Game", 
+          style = "qje", digits = 4, column.labels = c("Question 3a Model", "Question 3c Model"), 
+          header = FALSE, no.space = TRUE, title = "Regression Model for Question 3c")
+
+marrCoef <- model3c$coefficients["marr"]
+marrPValue <- coef(summary(model3c))["marr", "Pr(>|t|)"]
+
+```
+
+Holding position and experience fixed, married players are predicted to score `r round(marrCoef, 2)` more points per game than unmarried players. However, the p-Value for $H_0: \beta_{marr} = 0$ is equal to `r round(marrPValue, 4)`. Since this value is way larger than 0.05 (assuming 5% significance level), we cannot reject the null hypothesis $H_0$, which states that the effect of _marr_ is statistically insignificant. Therefore, we cannot conclude that the productivity (based on points per game) of married players is different from unmarried players.  
+
+\pagebreak
+
+## Question 3d: Interactions of Marriage with Experience Variables  
+
+The right column of table 4 displays the model information of regressing points per game (scored by player) on the player's experience (both _exper_ and the quadratic form, _expersq_), player's position, player's marital status, and the interaction between marital status and experience.  
+
+```{r Question3d, echo = FALSE, results = "asis"}
+
+model3d <- lm(points ~ exper + expersq + guard + forward + marr + exper:marr + expersq:marr, data = data)
+stargazer(list(model3c, model3d), type = out_format, dep.var.labels = "Points per Game", 
+          style = "qje", digits = 4, column.labels = c("Question 3c Model", "Question 3d Model"), 
+          header = FALSE, no.space = TRUE, title = "Regression Model for Question 3d")
+
+jointTest <- linearHypothesis(model3d, c("marr = 0", "exper:marr = 0", "expersq:marr = 0"))
+
+```
+
+From the above report, we can observe that _marr_ is statistically insignificant while the two interaction terms are only significant at 10 percent level. If we assume 5% significance level, none of them is individually significant.  
+
+Next, we would need to test if these three variables are jointly significant. To test this, we perform F-test to test the difference between unrestricted model and restricted (without _marr_, _exper:marr_, and _expersq:marr_) model.  
+
+The p-Value for $H_0$ (which states that the three variables are jointly insignificant) is `r round(jointTest$"Pr(>F)"[2], 4)`. Assuming 5% significance level, this value is way higher than 0.05. Consequently, the null hypothesis $H_0$ cannot be rejected and we conclude that these three variables are jointly insignificant. In summary, there is no strong evidence that marital status affects points per game in this new model.  
+
+\pagebreak
+
+## Question 3e: Adding Assists Per Game  
+
+The right column of table 5 displays the model information of regressing assists per game (by player) on the player's experience (both _exper_ and the quadratic form, _expersq_), player's position, and player's marital status.  
+
+```{r Question3e, echo = FALSE, results = "asis"}
+
+model3e <- lm(assists ~ exper + expersq + guard + forward + marr, data = data)
+stargazer(list(model3c, model3e), type = out_format, 
+          dep.var.labels = c("Points per Game", "Assists per Game"), style = "qje", 
+          digits = 4, column.labels = c("Question 3c Model", "Question 3e Model"), 
+          header = FALSE, no.space = TRUE, title = "Regression Model for Question 3e")
+
+marrCoef2 <- model3e$coefficients["marr"]
+marrPValue2 <- coef(summary(model3e))["marr", "Pr(>|t|)"]
+
+```
+
+Similar to the results in Question 3c, both _forward_ and _marr_ are not statistically significant. However, the _guard_ variable is more significant in this new model (from 5 percent level in Question 3c to 1 percent level in Question 3e). This is expected since a guard often leads the team in assists performance.  
+
+From this model, married players are predicted to have `r round(marrCoef2, 2)` more assists per game than unmarried players. However, the p-Value for for $H_0: \beta_{marr} = 0$ is equal to `r round(marrPValue2, 4)`. This value (although smaller than the p-Value in 3c) is still larger than 0.05, assuming 5% significance level. As a result, we cannot reject the null hypothesis $H_0$ where the effect of _marr_ (on assists per game) is statistically insignificant. Therefore, we cannot conclude that married players have more assists per game than unmarried players.  

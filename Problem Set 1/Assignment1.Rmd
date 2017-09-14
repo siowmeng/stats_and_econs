@@ -1,0 +1,152 @@
+---
+title: 'Statistics and Econometrics: Problem Set 1'
+author: "Siow Meng Low"
+date: "14 October 2016"
+output: pdf_document
+---
+
+```{r libraries, echo = FALSE, message = FALSE, cache = FALSE}
+library(stargazer)
+library(knitr)
+library(ggplot2)
+
+output <- opts_knit$get("rmarkdown.pandoc.to")
+if (output == "html"){out_format <- "html"}
+if (output == "latex"){out_format <- "latex"}
+
+```
+
+# Question 1  
+
+## Question 1a: Simple Regression Model  
+
+Table 1 displays the model information of regressing infant birth weight (in ounces) on the average number of cigarettes the mother smoked per day during pregnancy (_cigs_).
+
+```{r Question1a, echo = FALSE, results = "asis"}
+load("D:/Imperial MSc/Statistics and Econometrics/Problem Sets/Problem Set 1/bwght.RData")
+
+model1a <- lm(bwght ~ cigs, data = data)
+stargazer(model1a, type = out_format, dep.var.labels = "Infant Birth Weight", 
+          header = FALSE, no.space = TRUE, title = "Regression Model for Question 1a")
+
+```
+
+## Question 1b: Prediction of Infant Birth Weights  
+
+When _cigs_ = 0, the predicted infant birth weight is equal to the constant term (intercept, $\hat{\beta}_0$), which is `r round(model1a$coefficients[1], 3)` ounces. When _cigs_ = 20, the predicted infant birth weight is `r round(predict(model1a, data.frame(cigs = 20)), 3)` ounces.  
+
+From the linear regression results, it can be seen the _cigs_ has a coefficient (slope, $\hat{\beta}_1$) of `r round(model1a$coefficients[2], 3)`. This means that each additional cigarette the mother smoked per day (on average) during pregnancy decreases the infant birth weight by `r round(model1a$coefficients[2], 3)` ounces. Hence the linear regression model predicts much lower birth weight for _cigs_ = 20.  
+
+## Question 1c: Causal Relationship  
+
+No, this regression model does not necessarily capture a causal relationship between infant birth weight and mother's smoking habits. To establish the causal effect, error term _u_ must be fixed while _cigs_ varies (in other words, _u_ and _cigs_ have to be uncorrelated). In this case, other factors in _u_ (e.g. mother's health, length of pregnancy, antenatal care), which can affect infant birth weights, may be correlated with mother's smoking habits.  
+
+The condition required to establish causal relationship (zero-conditional-mean assumption) states that the mean of _u_ has to be zero for any given _cigs_. From the below graph, the mean of the residuals does not seem to stay at 0 as predicted weights vary (note that predicted weight is simply a linear function of _cigs_ in our linear regression model). Therefore, this regression model does not necessarily capture a causal relationship between infant birth weight and mother's smoking habits.  
+
+```{r Question1c, echo = FALSE, results = "asis"}
+
+ggplot(model1a, aes(.fitted, .resid)) + geom_point(colour = "blue") + 
+    geom_hline(yintercept = 0, colour = "red") + 
+    labs(title = "Residuals against Predicted Infant Birth Weights", 
+         x = "Predicted Weights (in ounces)", y = "Residuals")
+
+```
+
+## Question 1d: Prediction of 125 Ounces  
+
+For birth weight of 125 ounces, _cigs_ has to be `r round((125 - model1a$coefficients[1]) / model1a$coefficients[2], 2)`. Since _cigs_ is the average number of cigarettes smoked per day, a negative number does not make sense.  
+
+As we only use a single independent variable for linear regression, the intercept $\hat{\beta}_0$: `r round(model1a$coefficients[1], 3)` is the predicted infant birth weight when mother does not smoke. From our regression model, infant birth weight decreases as _cigs_ increases. To obtain a weight greater than $\hat{\beta}_0$, _cigs_ will have to be negative. This is the part where linear regression model fails.  
+
+## Question 1e: Proportion of Non-Smoking Mothers  
+
+Yes, this implies that there are a lot of samples when _cigs_ = 0 and this reconciles with the finding in question 1d. As we can observe from the below histogram, there is a wide range of infant birth weights with non-smoking mothers. When we use linear regression with a single independent variable _cigs_, the OLS method minimises the sum of squared residuals and estimates a single value of infant birth weight with _cigs_ = 0. This single value would fail to explain the variations in infant birth weights when _cigs_ = 0.  
+
+```{r Question1e, echo = FALSE, results = "asis"}
+
+ggplot(data = data[data$cigs == 0, ], aes(x = bwght)) + geom_histogram(binwidth = 10) + coord_cartesian(xlim = c(20, 200)) + labs(title = "Histogram of Infant Birth Weights with Non-Smoking Mothers", x = "Birth Weights (in ounces)", y = "Count")
+
+```
+
+It can also easily be seen from the regression model report, the $R^2$ is as low as `r round(summary(model1a)$r.squared, 3)`. This implies that a large portion of the variations in infant birth weights cannot be explained by _cigs_ alone. Since non-smoking women make up 85% of the total data, we would not be able to explain the variations in their infant birth weights using _cigs_ alone. In this case, we can consider adding more independent variables to explain the variation in infant birth weights when _cigs_ = 0.  
+
+# Question 2  
+
+## Question 2a: Regression Model using Proportion of Black and Log of Median Income  
+
+Table 2 displays the model information of regressing price of medium soda (in log form) on proportion of black population (_prpblck_) and median family income in log form (_lincome_).  
+
+\pagebreak
+
+```{r Question2a, echo = FALSE, results = "asis"}
+load("D:/Imperial MSc/Statistics and Econometrics/Problem Sets/Problem Set 1/discrim.RData")
+
+# Question 2a
+model2a <- lm(lpsoda ~ prpblck + lincome, data = data)
+
+stargazer(model2a, type = out_format, dep.var.labels = "Log(Price of Medium Soda)", 
+          header = FALSE, no.space = TRUE, title = "Regression Model for Question 2a")
+
+```
+
+If _prpblck_ increase by 0.20, _psoda_ is estimated to have percentage increase of `r round(0.2 * model2a$coefficients[2] * 100, 2)`%.  
+
+## Question 2b: Regression on Proportion of Black Population Only  
+
+The right column of table 3 displays the model information of regressing price of medium soda (in log form) on proportion of black population (_prpblck_) only.  
+
+```{r Question2b, echo = FALSE, results = "asis"}
+# Question 2b
+model2b <- lm(lpsoda ~ prpblck, data = data)
+
+stargazer(list(model2a, model2b), type = out_format, dep.var.labels = "Log(Price of Medium Soda)", 
+          header = FALSE, no.space = TRUE, column.labels = c("Question 2a Model", "Question 2b Model"), 
+          title = "Regression Model for Question 2b")
+
+```
+
+The estimated slope of _prpblck_ reduces from `r round(model2a$coefficients[2], 3)` to `r round(model2b$coefficients[2], 3)`, which means _psoda_ is now estimated to have percentage increase of `r round(0.2 * model2b$coefficients[2] * 100, 2)`% with every 0.20 increase of _prpblck_. The discrimination effect is larger when income is included in the linear regression.  
+
+This is because _prpblck_ and _lincome_ has a negative correlation of `r round(cor(data$prpblck, data$lincome, use = "complete.obs"), 4)` and _lincome_ has a positive slope of `r round(model2a$coefficients[3], 3)` in the linear regression constructed in question 2a. This results in a negative bias while estimating the slope of _prpblck_ in question 2b. Consequently, the estimated slope of _prpblck_ is expected to be smaller in average.  
+
+## Question 2c: Regression on Proportion of Black, Log of Median Income, and Proportion in Poverty  
+
+The right column of table 4 displays the model information of regressing price of medium soda (in log form) on proportion of black population (_prpblck_), median family income in log form (_lincome_), and the proportio of poverty (_prppov_).  
+
+```{r Question2c, echo = FALSE, results = "asis"}
+# Question 2c
+model2c <- lm(lpsoda ~ prpblck + lincome + prppov, data = data)
+
+stargazer(list(model2a, model2c), type = out_format, dep.var.labels = "Log(Price of Medium Soda)", 
+          header = FALSE, no.space = TRUE, column.labels = c("Question 2a Model", "Question 2c Model"), 
+          title = "Regression Model for Question 2c")
+
+```
+
+The new $\hat{\beta}_{prpblck}$ becomes `r round(model2c$coefficients[2], 3)`, smaller than the $\hat{\beta}_{prpblck}$ in question 2a: `r round(model2a$coefficients[2], 3)`.  
+
+_prpblck_ and _prppov_ has a positive correlation of `r round(cor(data$prpblck, data$prppov, use = "complete.obs"), 4)` and $\hat{\beta}_{prppov}$ is positive. This results in a positive bias of $\hat{\beta}_{prpblck}$ when _prppov_ is omitted in question 2a. Thus, the $\hat{\beta}_{prpblck}$ in question 2a is larger than in question 2c.  
+
+## Question 2d: Correlation Between Log of Median Income and Proportion in Poverty  
+
+The correlation between _lincome_ and _prppov_ is `r round(cor(data$lincome, data$prppov, use = "complete.obs"), 4)`. It is expected to be a negative number close to -1. This is because poverty is defined using income level. The lower the median family income, the higher the proportion of families living in poverty. Therefore I expected it to be a high negative number due to their strong inverse relationship.  
+
+## Question 2e: Regression on Both Log of Median Income and Proportion in Poverty  
+
+This statement is not true in our context. First of all, these two variables do not have perfect collinearity and hence do not violate the assumptions of multiple regression model.  
+
+Secondly, from question 2c, we know that by excluding _prppov_ in the regression, $\hat{\beta}_{prpblck}$ will be overestimated on average (due to the omitted variable bias). Our objective is to inspect the effect of _prpblck_ ($\beta_{prpblck}$) on the price of medium soda, the inclusion of both _lincome_ and _prppov_ helps to remove some biases in estimating $\beta_{prpblck}$.  
+
+In addition, including both _lincome_ and _prppov_ has improved the overall fit of the regression model, with higher adjusted $R^2$ value. In other words, including both of them could better explain the variations of _lpsoda_ within the sample data.  
+
+The potential drawback in introducing correlated variables into the same regression is that it tends to increase the standard errors in estimating the $\beta$ coefficients (or slope) of all the correlated independent variables. In our case (question 2c), the standard errors are still reasonably small for us to inspect the relationships between the dependent variable (_lpsoda_) and independent variables (especially _prpblck_).  
+
+## Appendix: Scatter Plots  
+
+The following scatter plots are useful to visualise if there is any strong trend between the 4 variables, _lpsoda_, _prpblck_, _lincome_, _prppov_.  
+
+```{r Appendix, echo = FALSE, results = "asis"}
+
+pairs( ~ lpsoda + prpblck + lincome + prppov, data = data)
+
+```

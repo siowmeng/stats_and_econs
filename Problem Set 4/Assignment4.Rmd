@@ -1,0 +1,202 @@
+---
+title: 'Statistics and Econometrics: Problem Set 4'
+author: "Siow Meng Low"
+date: "4 November 2016"
+output: pdf_document
+---
+
+```{r libraries, echo = FALSE, message = FALSE, cache = FALSE}
+library(stargazer)
+library(knitr)
+library(ggplot2)
+library(car)
+
+output <- opts_knit$get("rmarkdown.pandoc.to")
+if (output == "html"){out_format <- "html"}
+if (output == "latex"){out_format <- "latex"}
+
+```
+
+# Question 1  
+
+## Question 1a: Return of Another Year of Education  
+
+The equation is given as:  
+
+\begin{center}
+$log(wage) = \beta_0 + \beta_1 educ + \beta_2 exper + \beta_3 educ \cdot exper + u$
+\end{center}
+
+It can be rewritten as:  
+
+\begin{center}
+$log(wage) = \beta_0 + (\beta_1 + \beta_3 exper)educ + \beta_2 exper + u$
+\end{center}
+
+Holding _exper_ and _u_ fixed, the return of another year of education is ($\beta_1 + \beta_3 exper$), in decimal form. In percentage form, it is $100 \cdot (\beta_1 + \beta_3 exper)$%  
+
+## Question 1b: Null and Alternative Hypothesis  
+
+The null hypothesis states that the return to education does not depend on the level of _exper_. This can be expressed as: $H_0$: $\beta_3$ = 0  
+
+For the alternative hypothesis, we cannot be sure if education and experience interact positively or negatively. The return of education may increase or decrease with higher level of experience. Therefore, we should use the two-sided alternative: $H_1$: $\beta_3 \neq 0$  
+
+\pagebreak
+
+## Question 1c: Hypothesis Testing  
+
+Table 1 displays the model information of regressing monthly wage (in log form) on education, experience, and the interaction term between education and experience.  
+
+```{r Question1c, echo = FALSE, results = "asis"}
+load("wage2.RData")
+
+wage.ols <- lm(lwage ~ educ + exper + educ:exper, data = data)
+
+stargazer(wage.ols, type = out_format, dep.var.labels = "Log(Wage)", style = "qje", digits = 4, 
+          header = FALSE, no.space = TRUE, title = "Regression Model for Question 1c")
+
+# Calculate the t-statistic using beta3 coefficient and standard error
+estBeta3 <- wage.ols$coefficients["educ:exper"]
+estStdErrorBeta3 <- coef(summary(wage.ols))["educ:exper", "Std. Error"]
+tStat <- estBeta3 / estStdErrorBeta3
+
+```
+
+The null hypothesis and alternative hypothesis are:  
+
+* $H_0$: $\beta_3$ = 0
+* $H_1$: $\beta_3 \neq$ 0
+
+From the above, it is clear that we would do an two-tail test. The critical value at 5% significance level is thus `r round(qnorm(0.975), 4)` (assume normal distribution since we have large degree of freedom, > 120).  
+
+The t-statistic is $\dfrac{\hat{\beta}_3}{se(\hat{\beta}_3)}$ = `r round(tStat, 4)`. Since this value is larger than the critical value `r round(qnorm(0.975), 4)`, we reject the null hypothesis and conclude that the return to education depends on the level of _exper_ (i.e. $\beta_3 \neq 0$).  
+
+## Question 1d: Expected Wage Prediction of an Average Person  
+
+```{r Question1d, echo = FALSE, results = "asis"}
+
+newdata <- data.frame(educ = 12, exper = 10)
+
+lwagePoint <- predict(wage.ols, newdata, interval = "none")
+wagePoint <- mean(exp(wage.ols$residuals)) * exp(lwagePoint)
+
+```
+
+The expected $\widehat{log(wage)}$ for an average person (with _educ_ = 12 and _exper_ = 10) is predicted to be `r round(lwagePoint, 3)`  
+
+To get the predicted expected wage for an average person, we will need to multiply $exp(\widehat{log(wage)}) = `r round(exp(lwagePoint), 2)`$ by $E(exp(u))$. Without assuming _u_ to be normally distributed, we can obtain the sample estimate of $E(exp(u))$ using $n^{-1}\Sigma_{i=1}^n exp(\hat{u_i}) = `r round(mean(exp(wage.ols$residuals)), 3)`$  
+
+Therefore, the predicted expected wage, $\widehat{wage}$ for an average person (with _educ_ = 12 and _exper_ = 10) is predicted to be `r round(wagePoint, 2)`   
+
+\pagebreak
+
+# Question 2  
+
+## Question 2a: OLS Using Quadratic Term  
+
+The equation is given as:  
+
+\begin{center}
+$log(bwght) = \beta_0 + \beta_1 npvis + \beta_2 npvis^2 + u$
+\end{center}
+
+Table 2 displays the model information of regressing birth weight (in log form) on the number of prenatal visits (both linear term and quadratic term).  
+
+```{r Question2a, echo = FALSE, results = "asis"}
+load("bwght2.RData")
+
+bwght.npvis.ols <- lm(lbwght ~ npvis + npvissq, data = data)
+stargazer(bwght.npvis.ols, type = out_format, dep.var.labels = "Log(Birth Weight)", 
+          style = "qje", digits = 4, 
+          header = FALSE, no.space = TRUE, title = "Regression Model for Question 2a")
+
+beta1 <- bwght.npvis.ols$coefficients["npvis"]
+beta2 <- bwght.npvis.ols$coefficients["npvissq"]
+
+dataNpvis <- data[complete.cases(data[ , c("npvis")]), ]
+noVisit <- sum(dataNpvis$npvis >= 22)
+
+```
+
+From the above table, although the coefficient of the quadratic term is small, it is very significant due to its small standard error. The p-Value, for $H_0: \beta_{npvis^2} = 0$, is extremely small: `r format(coef(summary(bwght.npvis.ols))["npvissq", "Pr(>|t|)"], digits = 2)`. As a result, we can see that the quadratic term is statistically significant even at 1% significance level.  
+
+## Question 2b: Number of Prenatal Visits that Maximizes log(_bwght_)  
+
+To calculate the number of prenatal visits that maximizes log(_bwght_), we use the first order derivative of $log(bwght)$ with respect to _npvis_. Assuming the error term _u_ is uncorrelated with _npvis_, the derivative is: $\dfrac{\partial(log(bwght))}{\partial(npvis)} = \beta_1 + 2\beta_2 npvis$  
+
+Next, set the derivative to zero and we have:
+
+\begin{center}
+$$\beta_1 + 2\beta_2 npvis = 0$$
+$$npvis = \dfrac{-\beta_1}{2\beta_2}$$
+\end{center}
+
+Using the estimated coefficients in Table 2, the estimated value of _npvis_, which maximizes log(_bwght_), is $\dfrac{`r format(-1 * beta1, digits = 3)`}{2(`r format(beta2, digits = 3)`)} = `r round((-1 * beta1) / (2 * beta2), 2)`$  
+
+It is shown that the number of prenatal visits that maximizes log(_bwght_) is estimated to be about 22. Note that there are 68 records with _npvis_ = _NA_ in the dataset. After removing these 68 records, there are `r noVisit` women who had at least 22 prenatal visits in the given sample.  
+
+## Question 2c: Decline of Birth Weight after 22 Prenatal Visits  
+
+Yes, it makes sense that birth weight is predicted to decline after 22 prenatal visits.  
+
+While more prenatal visits may indicate better prenatal care (and hence healthier babies with higher birth weights), a very high number of prenatal visits (in our data, more than 22 visits) may signal other pregnancy issues (e.g. health issues with mother or baby) that requires doctors' assistance. This could result in lower birth weights.  
+
+## Question 2d: Effects of Mother's Age  
+
+The new equation is:  
+
+\begin{center}
+$log(bwght) = \beta_0 + \beta_1 npvis + \beta_2 npvis^2 + \beta_3 mage + \beta_4 mage^2 + u$
+\end{center}
+  
+The right column of Table 3 displays the model information of regressing birth weight (in log form) on the number of prenatal visits (both linear term and quadratic term) and the mother's age (both linear term and quadratic term).  
+
+```{r Question2d, echo = FALSE, results = "asis"}
+
+bwght.mage.ols <- lm(lbwght ~ npvis + npvissq + mage + magesq, data = data)
+
+stargazer(list(bwght.npvis.ols, bwght.mage.ols), type = out_format, dep.var.labels = "Log(Birth Weight)", 
+          style = "qje", digits = 4, column.labels = c("Question 2a Model", "Question 2d Model"), 
+          header = FALSE, no.space = TRUE, title = "Regression Model for Question 2d")
+
+beta3 <- bwght.mage.ols$coefficients["mage"]
+beta4 <- bwght.mage.ols$coefficients["magesq"]
+
+# Excluding those records with npvis = NA
+dataMage <- data[complete.cases(data[ , c("npvis", "mage")]), ]
+totalSample <- dim(dataMage)[1]
+no31YearsOld <- sum(dataMage$mage >= 31)
+no32YearsOld <- sum(dataMage$mage >= 32)
+
+# Include records with npvis = NA
+# totalSample <- dim(data)[1]
+# no31YearsOld <- sum(data$mage >= 31)
+# no32YearsOld <- sum(data$mage >= 32)
+
+```
+
+To calculate the mother's age that maximizes log(_bwght_), we use the first order derivative of $log(bwght)$ with respect to _mage_. Since _npvis_ is held fixed, we can treat it as constant while deriving the derivative. Assuming the error term _u_ is uncorrelated with _mage_, the derivative is thus: $\dfrac{\partial(log(bwght))}{\partial(mage)} = \beta_3 + 2\beta_4 mage$  
+
+Next, set the derivative to zero and we have:
+
+\begin{center}
+$$\beta_3 + 2\beta_4 mage = 0$$
+$$mage = \dfrac{-\beta_3}{2\beta_4}$$
+\end{center}
+
+Using the estimated coefficients in Table 3, the value of _mage_, which maximizes log(_bwght_), is $\dfrac{`r format(-1 * beta3, digits = 3)`}{2(`r format(beta4, digits = 3)`)} = `r round((-1 * beta3) / (2 * beta4), 2)`$  
+
+From the above, the mother's age that maximizes log(_bwght_), with _npvis_ held fixed, is estimated to be about 31 years old.  
+
+Note that there are 68 records with _npvis_ = _NA_ in the given dataset and these 68 records are omitted while performing linear regression shown in Table 3. Excluding these 68 observations, the total number of samples is `r totalSample`, and the number of mothers with age:  
+
+* 31 Years Old and Above: `r no31YearsOld` women, the fraction is `r round(100 * (no31YearsOld / totalSample), 2)`%
+* 32 Years Old and Above: `r no32YearsOld` women, the fraction is `r round(100 * (no32YearsOld / totalSample), 2)`%
+
+Note that the numbers shown in above bulleted points exclude the 68 observations with _npvis_ = _NA_.  
+
+## Question 2e: Variation in log(_bwght_)  
+
+From Table 3, the model (with regressors: _npvis_, _npvissq_, _mage_ and _magesq_) has a $R^2$ value of `r round(summary(bwght.mage.ols)$r.squared, 4)` and Adjusted $R^2$ value of `r round(summary(bwght.mage.ols)$adj.r.squared, 4)`  
+
+This means that the model only explained around `r round(100 * summary(bwght.mage.ols)$r.squared, 2)`% of the variations in log(_bwght_). Obviously this is a very low value, and I would say that mother's age and number of prenatal visits explain very little of the variation in log(_bwght_). We could consider adding in more regressors for a better fit.  

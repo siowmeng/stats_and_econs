@@ -1,0 +1,323 @@
+---
+title: 'Statistics and Econometrics: Problem Set 3'
+author: "Siow Meng Low"
+date: "29 October 2016"
+output: pdf_document
+---
+
+```{r libraries, echo = FALSE, message = FALSE, cache = FALSE}
+library(stargazer)
+library(knitr)
+library(ggplot2)
+library(car)
+library(sandwich)
+library(lmtest)
+
+output <- opts_knit$get("rmarkdown.pandoc.to")
+if (output == "html"){out_format <- "html"}
+if (output == "latex"){out_format <- "latex"}
+
+```
+
+# Question 1  
+
+## Question 1a: Usual Standard Errors and Robust Standard Errors  
+
+The equation is given as:  
+
+\begin{center}
+$math4 = \beta_0 + \beta_1 lunch + \beta_2 log(enroll) + \beta_3 log(exppp) + u$
+\end{center}
+
+Table 1 below displays the model information of regressing $math4$ (percentage of students passing fourth grade passing math test) on _lunch_ (percentage of students eligible for free or reduced lunch), _lenroll_ (school enrollment, in natural log form), and _lexppp_ (expenditures per pupil, in natural log form). The left column contains the information of usual standard errors (in parentheses) whereas the right column shows the robust standard errors (in parentheses).  
+
+```{r Question1a, echo = FALSE, results = "asis"}
+load("meap00_01.RData")
+
+math4.ols <- lm(math4 ~ lunch + lenroll + lexppp, data = data)
+vcov.robust <- vcovHC(math4.ols, "HC1")
+#math4.ols.robust <- coeftest(math4.ols, vcov = vcov.robust)
+
+stargazer(list(math4.ols, math4.ols), type = out_format, 
+         se = list(NULL, sqrt(diag(vcov.robust))), 
+         dep.var.labels = "math4: Math Performance of 4th Graders", 
+         style = "qje", digits = 3, header = FALSE, no.space = TRUE, 
+         column.labels = c("Usual Standard Errors", "Robust Standard Errors"), 
+         title = "Question 1a - Standard Errors vs Robust Standard Errors")
+
+```
+
+From the above table, we can observe that the robust standard errors are larger than the usual standard errors. As a result, the statistical significance of some coefficients have been lowered. For instance, _lexppp_, which is significant at 10% level when usual standard errors are used, becomes not significant when we use robust standard errors.  
+
+## Question 1b: White Test for Heteroskedasticity  
+
+```{r Question1b, echo = FALSE, results = "asis"}
+
+fitted.math4 <- math4.ols$fitted.values
+math4.whitetest <- bptest(math4.ols, ~ fitted.math4 + I(fitted.math4^2))
+
+```
+
+The test statistic of the White Test is `r round(math4.whitetest$statistic, 2)` and p-value is `r format(math4.whitetest$p.value, digits = 4)`. The p-Value is extremely small. At 5% significance level, we reject the null hypothesis of homoskedasticity and conclude that heteroskedasticity is present in this model.  
+
+## Question 1c: Weighted Least Squares Estimation  
+
+Table 2 below compares the OLS with WLS estimates. The left column contains the information of the OLS estimates (with usual standard errors) whereas the right column displays the information of the WLS estimates (with usual standard errors).  
+
+```{r Question1c, echo = FALSE, results = "asis"}
+
+aux.y <- log(math4.ols$residuals^2)
+aux.model <- lm(aux.y ~ fitted.math4 + I(fitted.math4^2), data = data)
+g <- aux.model$fitted.values
+h <- exp(g)
+math4.wls <- lm(math4 ~ lunch + lenroll + lexppp, data = data, weights = 1/h)
+
+stargazer(list(math4.ols, math4.wls), type = out_format, 
+          dep.var.labels = "math4: Math Performance of 4th Graders", 
+          style = "qje", digits = 3, header = FALSE, no.space = TRUE, 
+          column.labels = c("OLS Estimates", "WLS Estimates"), 
+          title = "Question 1c - OLS vs WLS Estimates")
+
+```
+
+We can observe from the table that coefficients of WLS estimates are very different from OLS estimates. While the coefficient of _lunch_ remains unchanged, the coefficients of _lenroll_, _lexppp_, and the constant (i.e. intercept) term have all changed. The usual standard errors of WLS estimates are also smaller than that of OLS estimates. Consequently, the independent variable _lexppp_ has become much more statistically significant (significant at 1% level for WLS estimates).  
+
+\pagebreak
+
+## Question 1d: Robust Standard Errors of WLS  
+
+To allow misspecification of the variance function, we shall use the robust standard errors of the WLS estimates. Table 3 below compares the usual standard errors and robust standard errors of WLS. The left column contains the information of usual standard errors (in parentheses) whereas the right column shows the robust standard errors (in parentheses).  
+
+```{r Question1d, echo = FALSE, results = "asis"}
+
+vcov.wls.robust <- vcovHC(math4.wls, "HC1")
+#coeftest(math4.wls, vcov = vcovHC(math4.wls, "HC1"))
+
+stargazer(list(math4.wls, math4.wls), type = out_format, 
+         se = list(NULL, sqrt(diag(vcov.wls.robust))), 
+         dep.var.labels = "math4: Math Performance of 4th Graders", 
+         style = "qje", digits = 3, header = FALSE, no.space = TRUE, 
+         column.labels = c("Usual Standard Errors", "Robust Standard Errors"), 
+         title = "Question 1d - WLS Standard Errors vs Robust Standard Errors")
+
+```
+
+With the exception of _lunch_, the robust WLS standard errors of _lenroll_, _lexppp_, and constant (i.e. intercept) term are all larger than the usual WLS standard errors. As a result, the statistical significance of some coefficients have been lowered. For instance, _lenroll_, which is significant at 1% level with usual WLS standard errors, becomes significant at 5% level when we use robust WLS standard errors.  
+
+\pagebreak
+
+## Question 1e: Estimation of Effect of Spending  
+
+Table 4 below compares the OLS with WLS estimates (with robust standard errors for both types of estimates). The left column contains the information of the OLS estimates whereas the right column displays the information of the WLS estimates.  
+
+```{r Question1e, echo = FALSE, results = "asis"}
+
+stargazer(list(math4.ols, math4.wls), type = out_format, 
+          se = list(sqrt(diag(vcov.robust)), sqrt(diag(vcov.wls.robust))), 
+          dep.var.labels = "math4: Math Performance of 4th Graders", 
+          style = "qje", digits = 3, header = FALSE, no.space = TRUE, 
+          column.labels = c("OLS Estimates", "WLS Estimates"), 
+          title = "Question 1e - OLS vs WLS Estimating Effect of Spending (with Robust Standard Errors)")
+
+```
+
+Since we are interested in estimating the effect of spending, we shall focus on the independent variable, _lexppp_. Its WLS coefficient, $\beta_{lexppp}$ is much larger than OLS coefficient. Further more, the WLS estimate has a smaller robust standard error than OLS estimate. Consequently, the WLS coefficient is more precise and statistically more significant (WLS estimate of $\beta_{lexppp}$ is significant at 1% level whereas OLS estimate is not statistically significant).  
+
+As we can observe from this example, WLS addresses heteroskedasticity and provide a more efficient estimates (with lower robust standard errors than OLS estimates).  
+
+\pagebreak
+
+# Question 2  
+
+## Question 2a: Identify Multicollinearity  
+
+If we choose to include all the mentioned independent variables, the equation of this "Full Model" is in the following form (_center_ is used as the base case, hence not shown in the equation):  
+
+\begin{center}
+$log(wage) = \beta_0 + \beta_1 exper + \beta_2 coll + \beta_3 games + \beta_4 avgmin + \beta_5 guard + \beta_6 forward + \beta_7 points + \beta_8 rebounds + \beta_9 assists + \beta_{10} draft + \beta_{11} allstar + \beta_{12} black + \beta_{13} children + \beta_{14} marr + u$
+\end{center}
+  
+Table 5 displays the Variance Inflation Factors for all the independent variables. As a rule of thumb, a VIF value greater than 10 indicates multicollinearity problem. As we can see from the table, only _avgmin_ has a VIF value greater than 10. Therefore, it indicates that the presence of _avgmin_ causes multicollinerity problem.  
+
+```{r Question2a, echo = FALSE, results = "asis"}
+load("nbasal.RData")
+
+lwage.ols <- lm(lwage ~ exper + coll + games + avgmin + guard + forward + points 
+                + rebounds + assists + draft + allstar + black + children + marr, 
+                data = data)
+
+kable(sort(vif(lwage.ols)), format = "pandoc", digits = 3, col.names = c("VIF Value"), 
+      caption = "Variance Inflation Factors of All Independent Variables")
+
+```
+
+\pagebreak
+
+## Question 2b: Forward and Backward Stepwise Selections  
+
+Table 6 tabulates the models with lowest AIC using three stepwise selection methods:  
+
+* Leftmost Column: Forward-stepwise selection
+* Middle Column: Backward-stepwise selection
+* Rightmost Column: Both directions (Initial model contains no independent variable)
+
+```{r Question2b, echo = FALSE, results = "asis"}
+
+data.new <- na.omit(data)
+
+# Only intercept
+lwage.null <- lm(lwage ~ 1, data = data.new)
+# Full model contains all variables
+lwage.full <- lm(lwage ~ exper + coll + games + avgmin + guard + forward + points
+                 + rebounds + assists + draft + allstar + black + children + marr, 
+                 data = data.new)
+
+# Forward selection
+nba.forward <- step(lwage.null, scope = list(lower = lwage.null, upper = lwage.full), 
+                    direction = "forward", trace = 0)
+
+# Backward selection
+nba.backward <- step(lwage.full, data.new, direction = "backward", trace = 0)
+
+# Both Directions, start from null model
+nba.both <- step(lwage.null, scope = list(lower = lwage.null, upper = lwage.full), 
+                 direction = "both", trace = 0)
+
+# Both Directions, start from full model
+#step(lwage.full, scope = list(lower = lwage.null, upper = lwage.full), direction = "both")
+
+stargazer(list(nba.forward, nba.backward, nba.both), type = out_format, 
+          dep.var.labels = "log(wage)", 
+          style = "qje", digits = 3, header = FALSE, no.space = TRUE, 
+          column.labels = c("Forward Selection", "Backward Selection", "Both Directions"), 
+          title = "Question 2b - Lowest AIC by Forward and Backward Selections")
+
+```
+
+As we can see from the table, all the three selection methods produce the exact same model.  
+
+\pagebreak
+
+## Question 2c: Residual Plots  
+
+### Residual vs Fitted Plot  
+
+The first residual plot we are going to investigate is the "Residuals vs Fitted" plot.  
+
+```{r Question2c-1, echo = FALSE, results = "asis"}
+
+# Plot Residual vs Fitted Values
+plot(nba.forward, which = 1)
+
+```
+
+From the plot above, we can see that there are no extreme outliers. The spread of the residuals at each fitted value are roughly similar hence the linear model is adequate.  
+
+\pagebreak
+
+### Normal Q-Q Plot  
+
+The second plot to investigate is the normal QQ Plot.  
+
+```{r Question2c-2, echo = FALSE, results = "asis"}
+
+# Plot Normal Q-Q
+plot(nba.forward, which = 2)
+
+```
+
+From the plot above, the residuals seem to be approximately normally distributed since most of the points lie along the straight line. However, the distribution of residuals seem to have heavy tails at both ends (since both tails of Q-Q plot twist counterclockwise). This is especially the case for the left tail, where the (counterclockwise) twist is much more severe.  
+
+\pagebreak
+
+### Scaled Location Plot  
+
+Next plot to investigate is the Scaled Location plot.  
+
+```{r Question2c-3, echo = FALSE, results = "asis"}
+
+# Plot Scaled Location
+plot(nba.forward, which = 3)
+
+```
+
+Scaled Location plot shows us the spread of the residuals across different fitted values. From the plot, we can see that the residuals are roughly spreaded equally across all of the fitted values. This implies that our assumption of homoskedasticity should hold.  
+
+One thing to note is that towards the right end of the x-axis (with fitted value greater than 8), the residuals seem to be less spreaded compared with other fitted values. There might be some weak indications of heteroskedasticity, homoskedasticity tests might need to be performed to affirm this.  
+
+\pagebreak
+
+### Residuals vs Leverage Plot  
+
+The last plot to investigate is the "Residuals vs Leverage" plot.  
+
+```{r Question2c-4, echo = FALSE, results = "asis"}
+
+# Plot Residuals vs Leverage
+plot(nba.forward, which = 5)
+
+```
+
+From the plot, we can see that there are a few high leverage points. However, their Cook's distances are relatively small (smaller than 0.5). This means that although they have high leverage values, they are not particularly influential.  
+
+In other words, these data points would not be extreme outliers. However, it is still good to examine these points with high leverage (especially the point marked as '103').  
+
+\pagebreak
+
+## Question 2d: AIC Without _avgmin_  
+
+Table 7 tabulates the models with lowest AIC using three stepwise selection methods (without _avgmin_ in the full model):  
+
+* Leftmost Column: Forward-stepwise selection
+* Middle Column: Backward-stepwise selection
+* Rightmost Column: Both directions (Initial model contains no independent variable)
+
+```{r Question2d-1, echo = FALSE, results = "asis"}
+
+# Full model contains all variables except avgmin
+lwage.2d.full <- lm(lwage ~ exper + coll + games + guard + forward + points
+                 + rebounds + assists + draft + allstar + black + children + marr, 
+                 data = data.new)
+# Forward selection
+nba.2d.forward <- step(lwage.null, scope = list(lower = lwage.null, upper = lwage.2d.full), 
+                       direction = "forward", trace = 0)
+
+# Backward selection
+nba.2d.backward <- step(lwage.2d.full, data.new, direction = "backward", trace = 0)
+
+# Both Directions, start from null model
+nba.2d.both <- step(lwage.null, scope = list(lower = lwage.null, upper = lwage.2d.full), 
+                    direction = "both", trace = 0)
+
+stargazer(list(nba.2d.forward, nba.2d.backward, nba.2d.both), type = out_format, 
+          dep.var.labels = "log(wage)", 
+          style = "qje", digits = 3, header = FALSE, no.space = TRUE, 
+          column.labels = c("Forward Selection", "Backward Selection", "Both Directions"), 
+          title = "Question 2d - Lowest AIC by Forward and Backward Selections (without avgmin)")
+
+```
+
+As observed from the above table, "Forward Selection" and "Both Direction" produced the same linear model whereas "Backward Selection" produced another linear model which uses a different set of independent variables. The differences between these models are that:  
+
+* Forward Selection has _rebounds_ in final model, which is not present in the final model of Backward Selection
+* Backward Selection has _guard_ and _black_ in the final model, which are not present in the final model of Forward Selection
+
+Note the the $R^2$ and adjusted $R^2$ of both models are very close. Although Forward Selection and Backward Selection picked different set of independent variables, the final models are equally adequate.  
+
+As we noted from Question 2a, the VIF value of _avgmin_ is greater than 10 and it might cause multicollinearity as it is highly correlated with some of the independent variables in the "Full Model". The three variables, which are most highly correlated with _avgmin_ in the "Full Model", are listed in Table 8 below.  
+
+```{r Question2d-2, echo = FALSE, results = "asis"}
+
+avgminCor <- cor(data$avgmin, data, use = "complete.obs")
+corVector <- c(avgminCor)
+names(corVector) <- colnames(avgminCor)
+
+kable(sort(corVector, decreasing = TRUE)[3:5], format = "pandoc", digits = 3, 
+     col.names = c("Correlation"), caption = "Independent Variables Highly Correlated with avgmin")
+
+```
+
+We can see that _points_ is highly correlated with _avgmin_. By ensuring _avgmin_ is not in the final model, the multicollinearity effect is lessened and the standard error for _points_ in Table 7 is now lower than in Table 6 (Question 2b).  
+
+One last observation to note is that the $R^2$ and adjusted $R^2$ values in Table 7 are very close to the values in Table 6 (Question 2b). This is because AIC aims to seek a balance between fit and simplicity. Since _avgmin_ is no longer in consideration, AIC will now pick other highly correlated independent variables, such as _rebounds_ and _assists_, to explain the variations in _lwage_.  
+

@@ -1,0 +1,276 @@
+---
+title: 'Statistics and Econometrics: Problem Set 5'
+author: "Siow Meng Low"
+date: "10 November 2016"
+output: pdf_document
+---
+
+```{r libraries, echo = FALSE, message = FALSE, cache = FALSE, warning = FALSE}
+library(stargazer)
+library(knitr)
+library(ggplot2)
+library(car)
+library(lmtest)
+library(plm)
+
+output <- opts_knit$get("rmarkdown.pandoc.to")
+if (output == "html"){out_format <- "html"}
+if (output == "latex"){out_format <- "latex"}
+
+```
+
+# Question 1  
+
+## Question 1a: Linear Probability Model  
+
+The equation of the linear probability model is given as:  
+
+\begin{center}
+$P(favwin = 1 | spread) = \beta_0 + \beta_1 spread$
+\end{center}
+
+The _spread_ variable is the Las Vegas point spread (used for sports betting purpose). When $spread = 0$, neither team is favoured by the betting system. If the _spread_ variable incorporates all relevant information (e.g. historical performance, favoured team is at home), then neither team has an advantage over the other since there is no favourite. In this case, we would expect the probability of winning (for the "favoured" team) to be 0.5, since both teams are equally likely to win the match.  
+
+When $spread = 0$, we could rewrite the equations as:
+
+\begin{center}
+$P(favwin = 1 | spread = 0) = \beta_0$
+\end{center}
+
+As discussed earlier, we expect the probability to be 0.5 when $spread = 0$. Since this probability is equal to $\beta_0$, we expect $\beta_0 = 0.5$ as well.  
+
+## Question 1b: OLS Estimation of the Linear Probability Model  
+
+Table 1 displays the model information of the linear probability model. The left column contains the information of usual standard errors (in parentheses) whereas the right column shows the robust standard errors (in parentheses).  
+
+```{r Question1b, echo = FALSE, results = "asis"}
+load("pntsprd.RData")
+
+# Linear Proabibility Model
+favwin.lpm <- lm(favwin ~ spread, data = data)
+
+# Robust Estimates
+vcov.robust <- vcovHC(favwin.lpm, "HC1")
+favwin.lpm.robust <- coeftest(favwin.lpm, vcov = vcov.robust)
+
+stargazer(list(favwin.lpm, favwin.lpm), type = out_format, 
+         se = list(NULL, sqrt(diag(vcov.robust))), 
+         dep.var.labels = "Probability of Favoured Team's Win", 
+         style = "qje", digits = 4, header = FALSE, no.space = TRUE, 
+         column.labels = c("Usual Standard Errors", "Robust Standard Errors"), 
+         title = "Question 1b - LPM with Standard Errors and Robust Standard Errors")
+
+# T-Statistics (Std Error)
+tStats.std <- (favwin.lpm$coefficients["(Intercept)"] - 0.5) / summary(favwin.lpm)$coefficients["(Intercept)", "Std. Error"]
+# T-Statistics (Robust Std Error)
+tStats.rob <- (favwin.lpm.robust["(Intercept)", "Estimate"] - 0.5) / favwin.lpm.robust["(Intercept)", "Std. Error"]
+
+# Linear Hypothesis Test (Std Error)
+#linearHypothesis(favwin.lpm, c("(Intercept) = 0.5"))
+# Linear Hypothesis Test (Robust Std Error)
+#linearHypothesis(favwin.lpm, c("(Intercept) = 0.5"), white.adjust = "hc1")
+
+```
+
+The null hypothesis and alternative hypothesis are:  
+
+* $H_0$: $\beta_0$ = 0.5
+* $H_1$: $\beta_0 \neq$ 0.5
+
+We would need to do a two-tail test to test the null hypothesis. The critical value at 5% significance level (for two-tail test) is thus `r round(qnorm(0.975), 4)` (assume normal distribution since we have large degree of freedom, > 120).  
+
+Using the usual standard error, the t-statistic is $\dfrac{\hat{\beta}_0 - 0.5}{se(\hat{\beta}_0)}$ = `r round(tStats.std, 4)` and the corresponding p-Value is `r round(pnorm(tStats.std, lower.tail = FALSE) * 2, 4)`. The t-statistic is a lot larger than the critical value (and also p-Value is a lot smaller than 0.05), hence we reject $H_0: \beta_0 = 0.5$  
+
+Using robust standard error, the t-statistic is $\dfrac{\hat{\beta}_0 - 0.5}{robust\, se(\hat{\beta}_0)}$ = `r round(tStats.rob, 4)` and the corresponding p-Value is `r round(pnorm(tStats.rob, lower.tail = FALSE) * 2, 4)`. The t-statistic is a larger than the critical value (and also p-Value is smaller than 0.05), hence we also reject $H_0: \beta_0 = 0.5$  
+
+In conclusion, we reject the null hypothesis $H_0: \beta_0 = 0.5$ after doing a two-tail test using both usual and robust standard errors.  
+
+## Question 1c: Probit Model  
+
+Table 2 displays the model information of the probit model for $P(favwin = 1 | spread)$.  
+
+```{r Question1c, echo = FALSE, results = "asis"}
+
+favwin.probit <- glm(favwin ~ spread, family = "binomial"(link = "probit"), data = data)
+
+stargazer(favwin.probit, type = out_format, dep.var.labels = "Probability of Favoured Team's Win", 
+          style = "qje", digits = 4, 
+          header = FALSE, no.space = TRUE, title = "Probit Model for Question 1c")
+
+# Pseudo R-Square
+favwin.probit.rsquare <- 1 - favwin.probit$deviance / favwin.probit$null.deviance
+# Percentage Correctly Predicted
+favwin.probit.percent <- sum(abs(data$favwin - favwin.probit$fitted.values) <= 0.5) / nrow(data) * 100
+
+# Z-Statistics (Std Error)
+zStats <- favwin.probit$coefficients["(Intercept)"] / summary(favwin.probit)$coefficients["(Intercept)", "Std. Error"]
+
+# Linear Hypothesis Test
+#linearHypothesis(favwin.probit, c("(Intercept) = 0"))
+
+```
+
+\begin{center}
+$Pseudo\, R^2$ = `r round(favwin.probit.rsquare, 4)`,  Percentage Correctly Predicted = `r round(favwin.probit.percent, 2)`\%
+\end{center}
+
+The Probit model uses the standard normal cumulative distribution function $G(z) = \Phi(z)$. In our case, the equation of the probit model is:
+
+\begin{center}
+$P(favwin = 1 | spread) = \Phi(\beta_0 + \beta_1 spread)$
+\end{center}
+
+Let us consider the case when _spread_ = 0, then the equation becomes $P(favwin = 1 | spread = 0) = \Phi(\beta_0)$. If the intercept is zero, the probability becomes $P(favwin = 1 | spread = 0) = \Phi(0) = 0.5$.  
+
+Similar to reasoning in Section 1a, we would exepect the probability of winning (by "favoured" team) to be 0.5 when _spread_ = 0 and if _spread_ incorporates all relevant information. By testing the null hypothesis $H_0: \beta_0 = 0$ for the probit model, we can examine whether the probability is indeed 0.5 when _spread_ = 0  
+
+The null hypothesis and alternative hypothesis are:  
+
+* $H_0$: $\beta_0$ = 0
+* $H_1$: $\beta_0 \neq$ 0
+
+Since the MLE estimator of Probit is asymptotically normal, we could use the two-tail Z-test to test the null hypothesis. The critical value at 5% significance level (for two-tail test) is thus `r round(qnorm(0.975), 4)`.  
+
+The test statistic is $\dfrac{\hat{\beta}_0}{se(\hat{\beta}_0)}$ = `r round(zStats, 4)` and the corresponding p-Value is `r round(pnorm(zStats, lower.tail = TRUE) * 2, 4)`. The absolute value of the test statistic is `r round(abs(zStats), 4)` and it is way smaller than the critical value (and also p-Value is extremely large), hence we fail to reject the null hypothesis that the intercept is zero, $H_0: \beta_0 = 0$  
+
+Note that the result of this hypothesis testing indicates that the probability of "favoured" team's win is likely to be near to 0.5 when _spread_ = 0, when we use Probit model. This conclusion is different from Question 1b when we tested the Linear Probability Model.  
+
+## Question 1d: Probability Prediction when _spread_ = 10  
+
+```{r Question1d, echo = FALSE, results = "asis"}
+
+favwin.probit.estBeta0 <- favwin.probit$coefficients["(Intercept)"]
+favwin.probit.estBeta1 <- favwin.probit$coefficients["spread"]
+probitPrediction <- pnorm(favwin.probit.estBeta0 + favwin.probit.estBeta1 * 10, lower.tail = TRUE)
+#predict(favwin.probit, newdata = data.frame(spread = 10), type = "response")
+
+favwin.lpm.estBeta0 <- favwin.lpm$coefficients["(Intercept)"]
+favwin.lpm.estBeta1 <- favwin.lpm$coefficients["spread"]
+lpmPrediction <- favwin.lpm.estBeta0 + favwin.lpm.estBeta1 * 10
+#predict(favwin.lpm, newdata = data.frame(spread = 10))
+
+```
+
+When _spread_ = 10, the probit model estimates the probability: $\hat{P}(favwin = 1 | spread = 10) = \Phi(\hat{\beta_0} + \hat{\beta_1} spread) = \Phi(`r round(favwin.probit.estBeta0, 4)` + `r round(favwin.probit.estBeta1, 4)`(10)) = `r round(probitPrediction, 4)`$  
+
+The LPM model estimates: $\hat{P}(favwin = 1 | spread = 10) = \hat{\beta_0} + \hat{\beta_1} spread = `r round(favwin.lpm.estBeta0, 4)` + `r round(favwin.lpm.estBeta1, 4)`(10) = `r round(lpmPrediction, 4)`$  
+
+The probability estimated by the probit model is a bit higher than the LPM model.  
+
+## Question 1e: Joint Significance  
+
+Table 3 displays the model information of the probit model for $P(favwin = 1 | spread, favhome, fav25, und25)$, after adding in independent variables _favhome_, _fav25_, _und25_.  
+
+```{r Question1e, echo = FALSE, results = "asis"}
+
+favwin.joint.probit <- glm(favwin ~ spread + favhome + fav25 + und25, 
+                           family = "binomial"(link = "probit"), data)
+
+stargazer(favwin.joint.probit, type = out_format, dep.var.labels = "Probability of Favoured Team's Win", 
+          style = "qje", digits = 4, header = FALSE, no.space = TRUE, 
+          title = "Question 1e - Probit Model with Additional Variables")
+
+# Pseudo R-Square
+favwin.joint.probit.rsquare <- 1 - favwin.joint.probit$deviance / favwin.joint.probit$null.deviance
+# Percentage Correctly Predicted
+favwin.joint.probit.percent <- sum(abs(data$favwin - favwin.joint.probit$fitted.values) <= 0.5) / nrow(data) * 100
+
+LRStats <- 2 * (logLik(favwin.joint.probit) - logLik(favwin.probit))
+
+# Likelihood Ratio Test
+#lrtest(favwin.joint.probit, favwin.probit)
+
+```
+
+\begin{center}
+$Pseudo\, R^2$ = `r round(favwin.joint.probit.rsquare, 4)`,  Percentage Correctly Predicted = `r round(favwin.joint.probit.percent, 2)`\%
+\end{center}
+
+Next, we would like to test the joint significance of the three new independent variables. The unrestricted model would be this model and the restricted model is the probit model in Section 1c. Since we have added in 3 new independent variables, the likelihood ratio statistics will follow a chi-square distribution of 3 degrees of freedom: $LR = 2(L_{ur} - L_{r}) \sim \chi_{3}^2$  
+
+For a chi-square (df = 3) distribution, the critical value at 5% significance level is `r round(qchisq(0.95, 3), 4)`  
+
+The value of the Likelihood Ratio Statistic is: $2(L_{ur} - L_{r}) = 2(`r round(logLik(favwin.joint.probit), 3)` - `r round(logLik(favwin.probit), 3)`) = `r round(LRStats, 3)`$ and the corresponding p-Value is `r round(pchisq(LRStats, 3, lower.tail = FALSE), 4)`.  
+
+The test statistic is way smaller than the critical value (and the p-Value is a lot larger than 0.05), hence we fail to reject the null hypothesis $H_0: \beta_{favhome} = 0, \beta_{fav25} = 0, \beta_{und25} = 0$. In other words, these three variables are jointly insignificant.  
+
+From the testing results, the variable _spread_ seems to incorporate the observable information contained in the three independent variables _favhome_, _fav25_, and _und25_. Consequently, when _spread_ has been controlled for, these three variables becomes jointly very insignificant (and can be dropped from the model).  
+
+Note that since we only did the joint significance test for three independent variables (_favhome_, _fav25_, and _und25_), we can't say that _spread_ incorporates "all" other observable information (e.g. _neutral_, _fregion_, _uregion_) as well. Further join significance test can be performed if we would like to find out.  
+
+# Question 2  
+
+## Question 2a: First Differencing  
+
+The equation of the basic model is given as:  
+
+\begin{center}
+$hrsemp_{it} = \beta_0 + \delta_1 d88_t + \delta_2 d89_t + \beta_1 grant_{it} + \beta_2 grant_{i,t-1} + \beta_3 log(employ_{it}) + a_i + u_{it}$
+\end{center}
+
+The first-differenced equation is thus:
+
+\begin{center}
+$\Delta{hrsemp_i} = \delta_1 \Delta{d88_t} + \delta_2 \Delta{d89_t} + \beta_1 \Delta{grant_i} + \beta_2 \Delta{grant_{i,-1}} + \beta_3 \Delta{log(employ_i)} + \Delta{u_i}$
+\end{center}
+
+From the above equation, it is clear that we would use a first-differenced model without intercept for estimation. Table 4 displays the model information of the first-differenced estimation.  
+
+```{r Question2a, echo = FALSE, results = "asis"}
+load("jtrain.RData")
+
+hrsemp.fd <- plm(hrsemp ~ 0 + d88 + d89 + grant + grant_1 + lemploy, data = data, 
+                index = c("fcode", "year"), effect = "individual", model = "fd")
+
+stargazer(hrsemp.fd, type = out_format, dep.var.labels = "Difference in Hours of Job Training per Employee", 
+          style = "qje", digits = 4, 
+          header = FALSE, no.space = TRUE, title = "First-Differenced Model for Question 2a")
+
+# First-differenced model with intercept
+# hrsemp.intercept.fd <- plm(hrsemp ~ d89 + grant + grant_1 + lemploy, data = data, 
+#                 index = c("fcode", "year"), effect = "individual", model = "fd")
+
+# Total Number of Firms
+totalFirms <- length(unique(data$fcode))
+
+# Data without missing records
+present <- data[complete.cases(data[ , c("hrsemp", "grant", "grant_1", "d88", "d89", "lemploy")]), ]
+
+# Number of firms with more than 2 time periods
+numFirms <- sum(table(present$fcode) >= 2)
+
+# Estimated coefficient of grant
+grantEstimate <- summary(hrsemp.fd)$coefficients["grant", "Estimate"]
+grantPValue <- summary(hrsemp.fd)$coefficients["grant", "Pr(>|t|)"]
+
+# Estimated coefficient of last year's grant
+lastGrantEstimate <- summary(hrsemp.fd)$coefficients["grant_1", "Estimate"]
+lastGrantPValue <- summary(hrsemp.fd)$coefficients["grant_1", "Pr(>|t|)"]
+
+# Estimated coefficient of log(number of employees)
+lemployEstimate <- summary(hrsemp.fd)$coefficients["lemploy", "Estimate"]
+lemployPValue <- summary(hrsemp.fd)$coefficients["lemploy", "Pr(>|t|)"]
+
+```
+
+There are a total of `r totalFirms` firms in the dataset. However, some of observations have missing values (i.e. NA) for _hrsemp_ and _lemploy_. For first-differenced estimation, a firm must have valid observations (i.e. no missing values for the dependent and independent variables) for at least 2 time periods in order to be used in the estimation. Therefore, the total number of firms that are used in the estimation is `r numFirms` and the number of observations used is `r summary(hrsemp.fd)$df.residual + 5`  
+
+If each firm had data on all variables for all the three periods, the number of observations used would be `r totalFirms`(3 - 1) = `r totalFirms * 2` observations.  
+
+## Question 2b: Coefficient of $\Delta{grant_i}$  
+
+From Table 4, the coefficient of $\Delta{grant_i}$, is estimated to be $\hat{\beta_1}$ = `r round(grantEstimate, 2)`. This means that a firm which has newly received a grant for the current year (and did not receive a grant for the previous year), is estimated to increase the job training hours per employee by `r round(grantEstimate, 2)` hours.  
+
+The p-Value for $H_0: \beta_1 = 0$ is extremely small: `r format(grantPValue, digits = 4)`, this means that $\Delta{grant_i}$ is statistically very significant.  
+
+## Question 2c: Significance $\Delta{grant_{i,-1}}$  
+
+From Table 4, we can see that $\Delta{grant_{i,-1}}$ is statistically insignificant. The p-Value for $H_0: \beta_2 = 0$ is a high value: `r format(lastGrantPValue, digits = 4)`, indicating it is statistically very insignificant.  
+
+This should not be surprising because a grant is intended to encourage the firm to train their employees in the same year. It is likely that the grant awarded in the previous year would only be valid (and used up) within that same year, hence it would not have a effect on the training hours of current year.  
+
+## Question 2d: Training at Larger Firms  
+
+From Table 4, we can see that the coefficient of $\Delta{log(employ_i)}$, is estimated to be $\hat{\beta_3}$ = `r round(lemployEstimate, 4)`. This means on average, every 1% increase in the number of employees only result in the increase of `r round(lemployEstimate / 100, 4)` training hours per employee. This difference is practically very small.  
+
+In addition, the p-Value for $H_0: \beta_3 = 0$ is an extremely high value: `r round(lemployPValue, 3)`. In other words, we cannot reject the null hypothesis that $\Delta{log(employ_i)}$ is statistically insignificant. Due to the insignificance of $\Delta{log(employ_i)}$ in our estimates, we conclude that there is no difference between the training hours (per employee) in large firms and small firms.  
